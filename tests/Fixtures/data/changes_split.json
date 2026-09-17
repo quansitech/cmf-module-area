@@ -1,0 +1,37 @@
+{
+    "version": "2026.260101.260101",
+    "changes": [
+        {
+            "change_type": "split_from",
+            "new_id": 653228,
+            "new_name": "和康",
+            "old_id": 653223,
+            "old_name": "皮山",
+            "detail": {
+                "summary": "析皮山县南部山区设立和康县，县政府驻原赛图拉镇（更名昆岭镇）",
+                "child_id_map": {
+                    "653223102": 653228101,
+                    "653223103": 653228102
+                },
+                "renames": [
+                    {"old_id": 653223102, "new_id": 653228101, "from": "赛图拉镇", "to": "昆岭镇"}
+                ]
+            },
+            "evidence": [
+                {"title": "2024年中华人民共和国县级以上行政区划变更列表", "url": "https://zh.wikipedia.org/wiki/2024年中华人民共和国县级以上行政区划变更列表"},
+                {"title": "新疆维吾尔自治区人民政府公告", "url": "https://www.xinjiang.gov.cn/example"}
+            ],
+            "confidence": "high"
+        },
+        {
+            "change_type": "add",
+            "new_id": 110105,
+            "new_name": "朝阳",
+            "detail": {"summary": "测试用纯新增（朝阳区恢复）"},
+            "evidence": [
+                {"title": "测试证据", "url": "https://example.com/notice"}
+            ],
+            "confidence": "low"
+        }
+    ]
+}

@@ -1,0 +1,13 @@
+{
+    "name": "quansitech/cmf-area-biz-fixture",
+    "description": "测试夹具：模拟安装的业务扩展包（含声明了地区引用的模型）",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Quansitech\\Cmf\\Area\\Tests\\Fixtures\\Biz\\": ""
+        }
+    },
+    "require": {
+        "quansitech/cmf-module-area": "*"
+    }
+}

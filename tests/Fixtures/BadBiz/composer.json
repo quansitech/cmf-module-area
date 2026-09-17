@@ -1,0 +1,13 @@
+{
+    "name": "quansitech/cmf-area-bad-biz-fixture",
+    "description": "测试夹具：引用列类型非法的业务扩展包（默认不注册）",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Quansitech\\Cmf\\Area\\Tests\\Fixtures\\BadBiz\\": ""
+        }
+    },
+    "require": {
+        "quansitech/cmf-module-area": "*"
+    }
+}
