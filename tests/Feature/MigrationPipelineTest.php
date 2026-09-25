@@ -33,7 +33,7 @@ function splitPayload(): array
     );
 }
 
-it('split_from：remap 列命中 child_id_map 的行自动改写，浅层值进人工清单，keep 列不动', function (): void {
+it('析出新设（split）：remap 列命中下级边的行自动改写，浅层值进人工清单，keep 列不动', function (): void {
     // 业务数据：门店（remap）存了乡镇级旧码；订单（keep）同样存乡镇级旧码
     Store::create(['title' => '赛图拉店', 'area_id' => 653223102]);
     Store::create(['title' => '皮山店', 'area_id' => 653223]);
@@ -46,14 +46,15 @@ it('split_from：remap 列命中 child_id_map 的行自动改写，浅层值进�
         ->and(Area::query()->find(653228101)->ext_name)->toBe('昆岭镇')
         ->and(Area::query()->find(653223)->status)->toBe(1);
 
-    // remap 列：命中 child_id_map 的改写为对应新码；等于旧单位本身的浅层值不动
+    // remap 列：命中下级边的改写为对应新码；等于旧单位本身的浅层值不动
     expect(Store::query()->where('title', '赛图拉店')->first()->area_id)->toBe(653228101)
         ->and(Store::query()->where('title', '皮山店')->first()->area_id)->toBe(653223);
 
     // keep 列不动
     expect(Order::query()->first()->region_id)->toBe(653223102);
 
-    // 人工清单：split_shallow_value
+    // 人工清单：split_shallow_value（单位级边 653223→653228 的 unit_mapping 不成立：
+    // 旧单位在新版仍存续，浅层值不可判定）
     expect($result['manual'])->toHaveCount(1)
         ->and($result['manual'][0]['reason'])->toBe('split_shallow_value')
         ->and(implode('、', $result['manual'][0]['affected_columns']))->toContain('stores.area_id');
@@ -77,10 +78,11 @@ it('迁移幂等：重复执行结果一致', function (): void {
 
     expect(Store::query()->first()->area_id)->toBe(653228101)
         ->and(Area::query()->whereIn('id', [653228, 653228101, 653228102])->count())->toBe(3)
-        ->and(AreaChange::query()->where('version', '2026.260101.260101')->count())->toBe(2);
+        // v2 档案：2 条 node（和康县/朝阳区）+ 3 条 edge，主键 (version, kind, side, old_id, new_id)
+        ->and(AreaChange::query()->where('version', '2026.260101.260101')->count())->toBe(5);
 });
 
-it('merge_into 且 full_transfer=true：remap 列批量改写，keep 列不动', function (): void {
+it('merge_into（unit_mapping 成立的单位级边）：remap 列批量改写，keep 列不动', function (): void {
     Store::create(['title' => '皮山店', 'area_id' => 653223]);
     Order::create(['title' => '历史订单', 'region_id' => 653223, 'region_name' => '皮山县']);
 
@@ -90,7 +92,7 @@ it('merge_into 且 full_transfer=true：remap 列批量改写，keep 列不动',
             ['op' => 'retire', 'id' => 653223, 'successor_id' => 653200],
         ],
         'mappings' => [
-            ['type' => 'merge_into', 'old' => 653223, 'new' => 653200, 'full_transfer' => true, 'child_id_map' => []],
+            ['from' => 653223, 'to' => 653200, 'unit_level' => true],
         ],
         'manual' => [],
         'records' => [],
@@ -104,17 +106,17 @@ it('merge_into 且 full_transfer=true：remap 列批量改写，keep 列不动',
         ->and(Area::query()->find(653223)->successor_id)->toBe(653200);
 });
 
-it('merge_into 且 full_transfer=false：remap 也不自动执行，一律进人工清单', function (): void {
+it('unit_mapping 不成立的单位级对不进 mappings：一律进人工清单（§1.4 一刀切不复存在）', function (): void {
     Store::create(['title' => '渝北店', 'area_id' => 500112]);
 
+    // v2 语义：不可判定的单位级对由生成期剔除出 mappings（payload 里根本没有该对），
+    // 执行器不再有 full_transfer 类型分支
     $payload = [
         'version' => '2026.260101.260101',
         'areas' => [['op' => 'retire', 'id' => 500112, 'successor_id' => 500157]],
-        'mappings' => [
-            ['type' => 'merge_into', 'old' => 500112, 'new' => 500157, 'full_transfer' => false, 'child_id_map' => []],
-        ],
+        'mappings' => [],
         'manual' => [
-            ['type' => 'merge_into', 'reason' => 'partial_transfer', 'old_id' => 500112, 'new_id' => 500157, 'hint' => '部分疆域旁落'],
+            ['type' => 'merge_into', 'reason' => 'partial_transfer', 'old_id' => 500112, 'new_id' => 500157, 'hint' => '疆域旁落'],
         ],
         'records' => [],
     ];
@@ -136,7 +138,7 @@ it('code_change：旧码退休、新码启用、remap 列改写', function (): v
             ['op' => 'retire', 'id' => 469003, 'successor_id' => 460400],
         ],
         'mappings' => [
-            ['type' => 'code_change', 'old' => 469003, 'new' => 460400, 'full_transfer' => true, 'child_id_map' => []],
+            ['from' => 469003, 'to' => 460400, 'unit_level' => true],
         ],
         'manual' => [],
         'records' => [],
@@ -162,7 +164,7 @@ it('code_reuse 归档迁移：旧行迁至归档 id，keep 引用一并指向归
             ['op' => 'insert', 'id' => 500105, 'pid' => 50, 'deep' => 2, 'name' => '两江', 'pinyin_prefix' => 'l', 'pinyin' => 'liang jiang', 'ext_id' => 500105000001, 'ext_name' => '两江新区'],
         ],
         'mappings' => [
-            ['type' => 'code_reuse', 'old' => 500105, 'new' => $archiveId, 'full_transfer' => true, 'child_id_map' => [], 'archive' => true],
+            ['from' => 500105, 'to' => $archiveId, 'unit_level' => true, 'archive' => true],
         ],
         'manual' => [],
         'records' => [],
@@ -236,14 +238,14 @@ it('延迟绑定：迁移文件不含业务表名；不同项目按自己的登�
         ->and(implode("\n", $result['info']))->toContain('stores.area_id');
 });
 
-it('down() 回滚：merge_into 反向 new→old', function (): void {
+it('down() 回滚：映射严格按执行序逆序反向', function (): void {
     Store::create(['title' => '皮山店', 'area_id' => 653223]);
 
     $payload = [
         'version' => '2026.260101.260101',
         'areas' => [['op' => 'retire', 'id' => 653223, 'successor_id' => 653200]],
         'mappings' => [
-            ['type' => 'merge_into', 'old' => 653223, 'new' => 653200, 'full_transfer' => true, 'child_id_map' => []],
+            ['from' => 653223, 'to' => 653200, 'unit_level' => true],
         ],
         'manual' => [],
         'records' => [],

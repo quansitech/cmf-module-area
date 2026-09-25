@@ -38,6 +38,10 @@
             "pestphp/pest-plugin": true
         }
     },
+    "scripts": {
+        "test": "XDEBUG_MODE=off vendor/bin/pest",
+        "test:parallel": "XDEBUG_MODE=off vendor/bin/pest --parallel"
+    },
     "minimum-stability": "stable",
     "prefer-stable": true
 }

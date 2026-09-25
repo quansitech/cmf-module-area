@@ -17,7 +17,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 class GenerateMigrationCommand extends Command
 {
     protected $signature = 'area:generate-migration
-        {changes : changes.json 路径（须先通过 area:check-changes 校验）}
+        {changes : changes.json 路径（v3 格式，须先通过 area:check-changes 校验）}
         {--old= : 旧基线 csv（默认模块内置 database/data/ok_data_level4.csv）}
         {--new= : 新版 csv（insert 操作的全字段取值来源）}
         {--output-dir= : 迁移输出目录（默认模块 database/migrations/updates）}';
@@ -30,6 +30,12 @@ class GenerateMigrationCommand extends Command
 
         if (! is_array($changes) || ! isset($changes['version'], $changes['changes'])) {
             $this->components->error('changes.json 结构不合法，请先通过 area:check-changes 校验');
+
+            return self::FAILURE;
+        }
+
+        if ((int) ($changes['schema_version'] ?? 0) !== 3) {
+            $this->components->error('changes.json 不是 v3 格式（schema_version=3，node + flat edge + 证据池），请按 area/skill/changes.schema.json 重写并通过 area:check-changes 校验');
 
             return self::FAILURE;
         }

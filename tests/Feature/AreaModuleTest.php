@@ -57,12 +57,25 @@ it('AreaPicker 数据端点：返回下级且过滤已撤销', function (): void
         ->assertJsonCount(2);
 });
 
-it('area:check-upstream 报告上游版本', function (): void {
+it('area:check-upstream 报告上游版本（--no-diff 廉价预检）', function (): void {
     Http::fake([
         'api.github.com/*' => Http::response(['tag_name' => '2999.999999.999999'], 200),
     ]);
 
-    $this->artisan('area:check-upstream')
+    $this->artisan('area:check-upstream', ['--no-diff' => true])
         ->expectsOutputToContain('2999.999999.999999')
         ->assertSuccessful();
+});
+
+it('area:check-upstream tag 相等时免下载报已对齐（升级方案 §13.6）', function (): void {
+    Http::fake([
+        'api.github.com/*' => Http::response(['tag_name' => config('cmf-area.data_version')], 200),
+    ]);
+
+    $this->artisan('area:check-upstream')
+        ->expectsOutputToContain('已对齐')
+        ->assertSuccessful();
+
+    // tag 相等 → 不触发任何下载请求
+    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'releases/download'));
 });

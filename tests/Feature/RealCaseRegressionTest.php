@@ -68,9 +68,14 @@ it('和康县析自皮山县：全流程（diff → 校验 → 生成迁移 → 
         ->and(Store::query()->first()->area_id)->toBe(653228102)
         ->and(Order::query()->first()->region_id)->toBe(653223);
 
-    // 变更档案留痕（evidence 自 changes.json）
-    $record = \Quansitech\Cmf\Area\Models\AreaChange::query()->where('change_type', 'split_from')->first();
+    // 变更档案留痕（v2：node/edge 分录，evidence 自 changes.json）
+    $record = \Quansitech\Cmf\Area\Models\AreaChange::query()
+        ->where('change_type', 'split_from')->where('kind', 'node')->where('side', 'new')->first();
     expect($record->evidence_url)->toContain('wikipedia.org');
+    // 下级边留档：kind=edge、old_id/new_id 存 from/to
+    $edgeRecord = \Quansitech\Cmf\Area\Models\AreaChange::query()
+        ->where('kind', 'edge')->where('old_id', 653223102)->where('new_id', 653228101)->first();
+    expect($edgeRecord)->not->toBeNull()->and($edgeRecord->side)->toBeNull();
 
     // ⑥ 回滚
     $migration->down();

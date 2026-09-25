@@ -1,0 +1,75 @@
+{
+    "schema_version": 3,
+    "version": "2026.260101.260101",
+    "evidence": {
+        "gov-2025-cq": {
+            "title": "国务院关于同意重庆市调整部分行政区划的批复",
+            "url": "https://example.com/cq-approval"
+        }
+    },
+    "changes": [
+        {
+            "kind": "node",
+            "id": 500105,
+            "name": "江北区",
+            "state": "retired",
+            "summary": "撤销江北区，与渝北区合并设立两江新区；江北区全部 2 个街道整建制并入",
+            "evidence": ["gov-2025-cq"],
+            "confidence": "high"
+        },
+        {
+            "kind": "node",
+            "id": 500112,
+            "name": "渝北区",
+            "state": "retired",
+            "summary": "撤销渝北区，与江北区合并设立两江新区；渝北区全部 2 个街道整建制并入",
+            "evidence": ["gov-2025-cq"],
+            "confidence": "high"
+        },
+        {
+            "kind": "node",
+            "id": 500157,
+            "name": "两江新区",
+            "state": "appeared",
+            "summary": "撤销江北区、渝北区，设立两江新区",
+            "evidence": ["gov-2025-cq"],
+            "confidence": "high"
+        },
+        {
+            "kind": "edge",
+            "from_id": 500105,
+            "to_id": 500157,
+            "summary": "江北区整体并入两江新区",
+            "evidence": ["gov-2025-cq"],
+            "confidence": "high"
+        },
+        {
+            "kind": "edge",
+            "from_id": 500112,
+            "to_id": 500157,
+            "summary": "渝北区整体并入两江新区",
+            "evidence": ["gov-2025-cq"],
+            "confidence": "high"
+        },
+        {
+            "kind": "edge",
+            "from_id": 500105001,
+            "to_id": 500157001
+        },
+        {
+            "kind": "edge",
+            "from_id": 500105002,
+            "to_id": 500157002
+        },
+        {
+            "kind": "edge",
+            "from_id": 500112001,
+            "to_id": 500157003
+        },
+        {
+            "kind": "edge",
+            "from_id": 500112002,
+            "to_id": 500157004
+        }
+    ]
+}

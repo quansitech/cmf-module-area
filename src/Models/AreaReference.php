@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $table_name
  * @property string $column_name
+ * @property string|null $pk_column 业务表主键列（行级回滚日志寻址用，null=执行期探测，默认 id）
  * @property string $merge_strategy keep / remap
  * @property string|null $snapshot_column 名称快照列
  * @property string $description
@@ -31,7 +32,7 @@ class AreaReference extends Model
 
     /** @var list<string> */
     protected $fillable = [
-        'table_name', 'column_name', 'merge_strategy', 'snapshot_column', 'description',
+        'table_name', 'column_name', 'pk_column', 'merge_strategy', 'snapshot_column', 'description',
     ];
 
     public static function tableName(): string

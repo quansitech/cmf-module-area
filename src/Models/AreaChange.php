@@ -11,8 +11,14 @@ use Illuminate\Support\Carbon;
  * 区划变更记录：每次版本升级的逐条变更档案，
  * 由迁移在业务项目执行时写入，支撑迁移执行、回滚与事后审计。
  *
+ * v2（changes.json 语义规范化）：记录分 node / edge 两类（kind），
+ * node 记录带版本侧（side=old/new）；edge 记录的 old_id/new_id 列存
+ * from/to。kind/side 为 null 的是 v1 存量行（按 v1 语义展示）。
+ *
  * @property int $id
  * @property string $version 所属上游版本
+ * @property string|null $kind v2 记录类别：node / edge（null = v1 存量）
+ * @property string|null $side node 记录的版本侧：old / new（edge 与 v1 存量为 null）
  * @property string $change_type
  * @property int|null $old_id
  * @property int|null $new_id
@@ -28,6 +34,10 @@ use Illuminate\Support\Carbon;
  */
 class AreaChange extends Model
 {
+    public const KIND_NODE = 'node';
+
+    public const KIND_EDGE = 'edge';
+
     public const TYPE_ADD = 'add';
 
     public const TYPE_SPLIT_FROM = 'split_from';
@@ -60,7 +70,7 @@ class AreaChange extends Model
 
     /** @var list<string> */
     protected $fillable = [
-        'version', 'change_type', 'old_id', 'new_id', 'old_name', 'new_name',
+        'version', 'kind', 'side', 'change_type', 'old_id', 'new_id', 'old_name', 'new_name',
         'detail', 'evidence_url', 'evidence_title', 'ai_summary', 'applied_at',
     ];
 

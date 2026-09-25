@@ -1,111 +1,124 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/quansitech/qscmf-filament/area/skill/changes.schema.json",
-    "title": "cmf-area 区划变更判读产出契约",
-    "description": "AI 判读产出的 changes.json 必须符合本契约；area:check-changes 按此校验（schema 层），另做逻辑层交叉核对。",
+    "title": "cmf-area 区划变更判读产出契约（v3：node + flat edge + 证据池）",
+    "description": "AI 判读产出的 changes.json 必须符合本契约；area:check-changes 按此校验（schema 层），另做逻辑层交叉核对。v3 语义（docs/changes-json-semantics.md + docs/area-precise-rollback-and-changes-v3.md §6）：文件里只有两类记录——node（一个单位在某一版的存续状态）与 edge（一条 旧id→新id 对应关系，拍平、任意层级、无嵌套）。相对 v2 的五刀简化：① 删 side（state 派生：retired→old、appeared→new、continued 单侧书写）；② 禁手写 change_type（纯派生）；③ attributes 值改字段名清单（值从两版 csv 取）；④ evidence 提为文件级证据池 + 引用；⑤ 下级边不写 evidence 时继承其单位级边的证据与摘要。不变量收缩为五条：I2 from_id ∈ 旧版 csv、to_id ∈ 新版 csv；I3 两端层级建议相同，跨层必须写 cross_level_reason；I4 例外只挂 node 且 exceptions[].id ⊆ 本节点同侧子树、只在同侧存在；I5 diff 事实按侧认领（旧侧事实不得由新侧字段认领）；I7 同 id 换单位必须显式声明 id_reuse（复用链成环报错转人工）。",
     "type": "object",
-    "required": ["version", "changes"],
+    "required": ["schema_version", "version", "changes"],
     "additionalProperties": false,
     "properties": {
+        "schema_version": {
+            "const": 3,
+            "description": "契约版本，固定为 3（v2 的 side/change_type/attributes 值对/行内证据格式已废弃）"
+        },
         "version": {
             "type": "string",
             "description": "目标上游版本号（须与 diff.json 的 to_version 一致）",
             "pattern": "^\\d{4}\\.\\d{6}\\.\\d{6}$"
         },
+        "from_version": {
+            "type": "string",
+            "description": "来源上游版本号（便于脱离 config 自证；须与 diff.json 的 from_version 一致）",
+            "pattern": "^\\d{4}\\.\\d{6}\\.\\d{6}$"
+        },
+        "evidence": {
+            "type": "object",
+            "description": "文件级证据池：引用 id => {title, url}。各条记录以引用 id 认领，禁止编造，查不到可靠来源标 confidence: low",
+            "additionalProperties": { "$ref": "#/$defs/evidenceEntry" }
+        },
         "changes": {
             "type": "array",
             "minItems": 1,
-            "items": { "$ref": "#/$defs/change" }
+            "items": {
+                "oneOf": [
+                    { "$ref": "#/$defs/node" },
+                    { "$ref": "#/$defs/edge" }
+                ]
+            }
         }
     },
     "$defs": {
-        "change": {
+        "node": {
             "type": "object",
-            "required": ["change_type", "evidence"],
+            "description": "一个单位在某一版的存续状态（side 由 state 派生）。叶子单位的两侧状态可由边端点推导时不必书写（校验器只要求事实被认领）；需要摘要/证据/例外/属性变化时才写。node 必须自证证据。",
+            "required": ["kind", "id", "state", "evidence"],
             "additionalProperties": false,
             "properties": {
-                "change_type": {
+                "kind": { "const": "node" },
+                "id": { "type": "integer", "description": "地区 id（retired 取旧版 id、appeared 取新版 id、continued 两版同 id）" },
+                "name": { "type": "string", "description": "单位名称（仅供人读，机器不交叉校验，records 名称从 csv 派生）" },
+                "state": {
                     "type": "string",
-                    "enum": ["add", "split_from", "merge_into", "rename", "abolish", "parent_change", "code_change", "code_reuse"]
+                    "enum": ["appeared", "retired", "continued"],
+                    "description": "appeared=新版有旧版无（派生 side=new）；retired=旧版有新版无（派生 side=old，id 可能被复用）；continued=两版均在且为同一单位（仅属性变化时书写，单侧书写，校验器派生对侧）"
                 },
-                "old_id": { "type": ["integer", "null"], "description": "变更前地区 ID（rename 时与 new_id 相同）" },
-                "new_id": { "type": ["integer", "null"], "description": "变更后地区 ID" },
-                "old_name": { "type": ["string", "null"] },
-                "new_name": { "type": ["string", "null"] },
-                "detail": {
-                    "type": "object",
-                    "properties": {
-                        "summary": { "type": "string", "description": "疆域归属描述 / AI 判定理由摘要" },
-                        "full_transfer": { "type": "boolean", "description": "merge_into 必填：旧区是否 100% 疆域并入单一承继者" },
-                        "child_id_map": {
-                            "type": "object",
-                            "description": "下级新旧 id 对照（旧 id => 新 id），覆盖任意层级",
-                            "patternProperties": { "^\\d+$": { "type": "integer" } },
-                            "additionalProperties": false
-                        },
-                        "renames": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["old_id", "new_id", "from", "to"],
-                                "properties": {
-                                    "old_id": { "type": "integer" },
-                                    "new_id": { "type": "integer" },
-                                    "from": { "type": "string" },
-                                    "to": { "type": "string" }
-                                },
-                                "additionalProperties": false
-                            }
-                        },
-                        "unmatched": {
-                            "type": "array",
-                            "description": "child_id_map 无法配对的下级（如同期撤并），必须逐条说明原因",
-                            "items": {
-                                "type": "object",
-                                "required": ["id", "reason"],
-                                "properties": {
-                                    "id": { "type": "integer" },
-                                    "reason": { "type": "string", "minLength": 1 }
-                                },
-                                "additionalProperties": false
-                            }
-                        }
-                    }
-                },
-                "evidence": {
+                "attributes": {
                     "type": "array",
-                    "minItems": 1,
-                    "description": "每条判定必须附信息源；查不到可靠来源标 confidence: low 而非编造",
+                    "description": "仅 state=continued 时出现：声明哪些字段变了（字段名清单），值由机器从两版 csv 取；声明的字段必须在两版 csv 间确有变化",
+                    "items": { "type": "string", "enum": ["name", "ext_name", "pid"] },
+                    "uniqueItems": true,
+                    "minItems": 1
+                },
+                "id_reuse": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "I7：同 id 换单位必须显式声明。仅 appeared node 可用；true 时 summary 必须写明复用对应关系（链式复用=旧单位在另一 id 下存续；废止复用=旧单位无承继、归档 90{id} 段）"
+                },
+                "exceptions": {
+                    "type": "array",
+                    "description": "I4：无对应项的下级例外，只挂 node。id 空间 = 本 node 的派生侧：retired 节点挂旧侧消失下级（如同期撤并），appeared 节点挂新侧新增下级（如托管）；必须 ⊆ 本节点同侧子树且只在同侧存在",
                     "items": {
                         "type": "object",
-                        "required": ["title", "url"],
+                        "required": ["id", "reason"],
                         "properties": {
-                            "title": { "type": "string", "minLength": 1 },
-                            "url": { "type": "string", "format": "uri" }
+                            "id": { "type": "integer" },
+                            "reason": { "type": "string", "minLength": 1 }
                         },
                         "additionalProperties": false
                     }
                 },
+                "summary": { "type": "string", "description": "AI 判定理由摘要（疆域归属描述）" },
+                "evidence": {
+                    "type": "array",
+                    "description": "证据池引用 id 列表（须存在于顶层 evidence 池）",
+                    "items": { "type": "string", "minLength": 1 },
+                    "minItems": 1
+                },
                 "confidence": { "type": "string", "enum": ["high", "low"], "default": "high" }
+            }
+        },
+        "edge": {
+            "type": "object",
+            "description": "一条 旧id→新id 对应关系（拍平、任意层级、无嵌套）。一条边只连两个 id：'5 镇去北碚'就是另一条独立的边，不存在'越界/旁落'的字段补丁。单位级边仅 unit_mapping 成立时自动执行；下级边一律执行。单位级边必须自带证据；下级边可省略 evidence 与 summary 以继承其单位级边。",
+            "required": ["kind", "from_id", "to_id"],
+            "additionalProperties": false,
+            "properties": {
+                "kind": { "const": "edge" },
+                "from_id": { "type": "integer", "description": "旧版 id（I2：必须存在于旧基线 csv；I1：≠ to_id）" },
+                "to_id": { "type": "integer", "description": "新版 id（I2：必须存在于新版 csv）" },
+                "cross_level_reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "I3：deep(from) ≠ deep(to) 时必填，说明跨层对应的理由"
+                },
+                "summary": { "type": "string", "description": "该对应关系的判读摘要（如'渝北区大湾镇划归北碚区'）；下级边省略时继承单位级边" },
+                "evidence": {
+                    "type": "array",
+                    "description": "证据池引用 id 列表；下级边省略时继承其单位级边（无单位级边的独立边必须自带）",
+                    "items": { "type": "string", "minLength": 1 },
+                    "minItems": 1
+                },
+                "confidence": { "type": "string", "enum": ["high", "low"], "default": "high" }
+            }
+        },
+        "evidenceEntry": {
+            "type": "object",
+            "required": ["title", "url"],
+            "properties": {
+                "title": { "type": "string", "minLength": 1 },
+                "url": { "type": "string", "format": "uri" }
             },
-            "allOf": [
-                {
-                    "if": { "properties": { "change_type": { "const": "merge_into" } } },
-                    "then": {
-                        "properties": {
-                            "detail": { "required": ["full_transfer"] }
-                        }
-                    }
-                },
-                {
-                    "if": { "properties": { "change_type": { "const": "split_from" } } },
-                    "then": { "required": ["old_id", "new_id"] }
-                },
-                {
-                    "if": { "properties": { "change_type": { "const": "rename" } } },
-                    "then": { "required": ["old_id", "new_id"] }
-                }
-            ]
+            "additionalProperties": false
         }
     }
 }

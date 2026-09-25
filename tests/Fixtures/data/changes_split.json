@@ -1,36 +1,61 @@
 {
+    "schema_version": 3,
     "version": "2026.260101.260101",
+    "evidence": {
+        "wiki-2024": {
+            "title": "2024年中华人民共和国县级以上行政区划变更列表",
+            "url": "https://zh.wikipedia.org/wiki/2024年中华人民共和国县级以上行政区划变更列表"
+        },
+        "xj-gov": {
+            "title": "新疆维吾尔自治区人民政府公告",
+            "url": "https://www.xinjiang.gov.cn/example"
+        },
+        "test-notice": {
+            "title": "测试证据",
+            "url": "https://example.com/notice"
+        }
+    },
     "changes": [
         {
-            "change_type": "split_from",
-            "new_id": 653228,
-            "new_name": "和康",
-            "old_id": 653223,
-            "old_name": "皮山",
-            "detail": {
-                "summary": "析皮山县南部山区设立和康县，县政府驻原赛图拉镇（更名昆岭镇）",
-                "child_id_map": {
-                    "653223102": 653228101,
-                    "653223103": 653228102
-                },
-                "renames": [
-                    {"old_id": 653223102, "new_id": 653228101, "from": "赛图拉镇", "to": "昆岭镇"}
-                ]
-            },
-            "evidence": [
-                {"title": "2024年中华人民共和国县级以上行政区划变更列表", "url": "https://zh.wikipedia.org/wiki/2024年中华人民共和国县级以上行政区划变更列表"},
-                {"title": "新疆维吾尔自治区人民政府公告", "url": "https://www.xinjiang.gov.cn/example"}
-            ],
+            "kind": "node",
+            "id": 653228,
+            "name": "和康县",
+            "state": "appeared",
+            "summary": "析皮山县南部山区设立和康县，县政府驻原赛图拉镇（更名昆岭镇）",
+            "evidence": ["wiki-2024", "xj-gov"],
             "confidence": "high"
         },
         {
-            "change_type": "add",
-            "new_id": 110105,
-            "new_name": "朝阳",
-            "detail": {"summary": "测试用纯新增（朝阳区恢复）"},
-            "evidence": [
-                {"title": "测试证据", "url": "https://example.com/notice"}
-            ],
+            "kind": "edge",
+            "from_id": 653223,
+            "to_id": 653228,
+            "summary": "和康县析自皮山县（皮山县存续，单位级浅层值进人工清单）",
+            "evidence": ["wiki-2024"],
+            "confidence": "high"
+        },
+        {
+            "kind": "edge",
+            "from_id": 653223102,
+            "to_id": 653228101,
+            "summary": "皮山县赛图拉镇划归和康县，更名昆岭镇",
+            "evidence": ["xj-gov"],
+            "confidence": "high"
+        },
+        {
+            "kind": "edge",
+            "from_id": 653223103,
+            "to_id": 653228102,
+            "summary": "皮山县木吉镇划归和康县",
+            "evidence": ["xj-gov"],
+            "confidence": "high"
+        },
+        {
+            "kind": "node",
+            "id": 110105,
+            "name": "朝阳区",
+            "state": "appeared",
+            "summary": "测试用纯新增（朝阳区恢复）",
+            "evidence": ["test-notice"],
             "confidence": "low"
         }
     ]

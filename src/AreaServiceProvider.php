@@ -8,10 +8,15 @@ use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Quansitech\Cmf\Area\Console\Commands\CheckChangesCommand;
 use Quansitech\Cmf\Area\Console\Commands\CheckUpstreamCommand;
+use Quansitech\Cmf\Area\Console\Commands\CleanupJournalCommand;
+use Quansitech\Cmf\Area\Console\Commands\CollectCommand;
 use Quansitech\Cmf\Area\Console\Commands\DiffCommand;
 use Quansitech\Cmf\Area\Console\Commands\DownloadCommand;
+use Quansitech\Cmf\Area\Console\Commands\FinalizeUpgradeCommand;
 use Quansitech\Cmf\Area\Console\Commands\GenerateMigrationCommand;
+use Quansitech\Cmf\Area\Console\Commands\PatchBaselineCommand;
 use Quansitech\Cmf\Area\Console\Commands\SyncReferencesCommand;
+use Quansitech\Cmf\Area\Console\Commands\VerifyBaselineCommand;
 use Quansitech\Cmf\Area\Facades\Area;
 use Quansitech\Cmf\Area\Services\ReferenceCollector;
 use Quansitech\Cmf\Core\Cmf;
@@ -33,7 +38,12 @@ class AreaServiceProvider extends PackageServiceProvider
                 DiffCommand::class,
                 CheckChangesCommand::class,
                 GenerateMigrationCommand::class,
+                PatchBaselineCommand::class,
+                VerifyBaselineCommand::class,
+                CollectCommand::class,
+                FinalizeUpgradeCommand::class,
                 SyncReferencesCommand::class,
+                CleanupJournalCommand::class,
             ]);
     }
 
@@ -59,6 +69,9 @@ class AreaServiceProvider extends PackageServiceProvider
      * 模块配置 / 迁移挂到 cmf 系列 tag，由 cmf:install 发布（不覆盖项目已有文件）。
      * 迁移同时 loadMigrationsFrom：发布到宿主后文件名一致，迁移器按名称去重。
      * updates/ 子目录内的升级迁移一并加载（与基线迁移同目录树）。
+     *
+     * 升级管理界面为文件态工作区（无数据库表），按 cmf-area.upgrade.enabled
+     * 在 Page::canAccess 运行期拦截，无需迁移（升级方案 §12）。
      */
     protected function registerModuleAssets(): void
     {
@@ -80,7 +93,8 @@ class AreaServiceProvider extends PackageServiceProvider
 
     /**
      * 向 Shield 登记本模块的权限点；宿主已在 config/filament-shield.php
-     * 配置同名条目时以宿主为准。
+     * 配置同名条目时以宿主为准。升级管理界面为单一向导页，可见性由
+     * AreaUpgradePage::canAccess 按 cmf-area.upgrade.enabled 拦截（升级方案 §12）。
      */
     protected function registerShieldPermissions(): void
     {

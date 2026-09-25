@@ -19,14 +19,14 @@ use RuntimeException;
  */
 class ReferenceCollector
 {
-    /** @var array<class-string, array<string, array{onMerge:string, snapshotColumn:?string, description:string}>> */
+    /** @var array<class-string, array<string, array{onMerge:string, snapshotColumn:?string, pkColumn:?string, description:string}>> */
     protected array $declarationCache = [];
 
     /**
      * 读取模型声明（纯数据、无副作用）。未定义 areaReferences() 时返回空数组。
      *
      * @param  class-string<Model>  $modelClass
-     * @return array<string, array{onMerge:string, snapshotColumn:?string, description:string}>
+     * @return array<string, array{onMerge:string, snapshotColumn:?string, pkColumn:?string, description:string}>
      */
     public function declarationsOf(string $modelClass): array
     {
@@ -57,6 +57,8 @@ class ReferenceCollector
             $normalized[$column] = [
                 'onMerge' => $onMerge,
                 'snapshotColumn' => isset($options['snapshotColumn']) ? (string) $options['snapshotColumn'] : null,
+                // 行级回滚日志按主键寻址；表无单主键（默认 id）时在此声明
+                'pkColumn' => isset($options['pkColumn']) ? (string) $options['pkColumn'] : null,
                 'description' => (string) ($options['description'] ?? ''),
             ];
         }
@@ -148,6 +150,7 @@ class ReferenceCollector
                     $rows[] = [
                         'table_name' => $table,
                         'column_name' => $column,
+                        'pk_column' => $options['pkColumn'],
                         'merge_strategy' => $options['onMerge'],
                         'snapshot_column' => $options['snapshotColumn'],
                         'description' => $options['description'],
@@ -173,18 +176,19 @@ class ReferenceCollector
             AreaReference::query()->upsert(
                 $chunk,
                 ['table_name', 'column_name'],
-                ['merge_strategy', 'snapshot_column', 'description', 'updated_at'],
+                ['pk_column', 'merge_strategy', 'snapshot_column', 'description', 'updated_at'],
             );
         }
 
         return ['packages' => $packages, 'synced' => count($rows), 'skipped' => $skipped];
     }
 
-    /** @var array<string, array{table_name:string, column_name:string, merge_strategy:string, snapshot_column:?string, description:string}> */
+    /** @var array<string, array{table_name:string, column_name:string, pk_column:?string, merge_strategy:string, snapshot_column:?string, description:string}> */
     protected static array $manualReferences = [];
 
     /**
      * 兜底注册口：无 Model 的表（DB facade 操作的历史表）手工登记。
+     * $pkColumn：表无单主键（默认 id）时显式声明主键列，供行级回滚日志寻址。
      */
     public static function registerReference(
         string $table,
@@ -192,6 +196,7 @@ class ReferenceCollector
         string $onMerge = AreaReference::STRATEGY_KEEP,
         ?string $snapshotColumn = null,
         string $description = '',
+        ?string $pkColumn = null,
     ): void {
         if (! in_array($onMerge, AreaReference::STRATEGIES, true)) {
             throw new RuntimeException("onMerge 取值非法：{$onMerge}");
@@ -200,6 +205,7 @@ class ReferenceCollector
         self::$manualReferences["{$table}.{$column}"] = [
             'table_name' => $table,
             'column_name' => $column,
+            'pk_column' => $pkColumn,
             'merge_strategy' => $onMerge,
             'snapshot_column' => $snapshotColumn,
             'description' => $description,

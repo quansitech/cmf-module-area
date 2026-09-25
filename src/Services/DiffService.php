@@ -157,7 +157,7 @@ class DiffService
      *
      * @param  array<int, array<string, mixed>>  $map
      */
-    protected function provinceOf(int $id, array $map): ?string
+    public function provinceOf(int $id, array $map): ?string
     {
         $guard = 0;
         $node = $map[$id] ?? null;
@@ -170,6 +170,91 @@ class DiffService
         }
 
         return null;
+    }
+
+    /**
+     * id 是否属于某地区（沿 pid 链向上，单 map 内判定，含 id == regionId 自身）。
+     *
+     * @param  array<int, array<string, mixed>>  $map
+     */
+    public function inSubtree(int $id, int $regionId, array $map): bool
+    {
+        $guard = 0;
+        $current = $id;
+
+        while ($guard++ < 8) {
+            if ($current === $regionId) {
+                return true;
+            }
+            $node = $map[$current] ?? null;
+            if ($node === null) {
+                return false;
+            }
+            $parent = (int) $node['pid'];
+            if ($parent === 0 || $parent === $current) {
+                return false;
+            }
+            $current = $parent;
+        }
+
+        return false;
+    }
+
+    /**
+     * id 是否属于选中地区集合（旧版/新版任一 map 的子树命中即算——
+     * 跨边界变更时事实可能只在一侧可见，升级方案 §8.1）。
+     *
+     * @param  list<int>  $regionIds
+     * @param  array<int, array<string, mixed>>  $oldMap
+     * @param  array<int, array<string, mixed>>  $newMap
+     */
+    public function isInRegions(int $id, array $regionIds, array $oldMap, array $newMap): bool
+    {
+        foreach ($regionIds as $regionId) {
+            if ($this->inSubtree($id, (int) $regionId, $oldMap) || $this->inSubtree($id, (int) $regionId, $newMap)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * diff 结果按选中地区子树过滤（各地区分组与 summary 同步收缩）。
+     *
+     * @param  array<string, mixed>  $diffJson  toJsonStructure 产出的 diff.json 结构
+     * @param  list<int>  $regionIds
+     * @param  array<int, array<string, mixed>>  $oldMap
+     * @param  array<int, array<string, mixed>>  $newMap
+     * @return array<string, mixed>
+     */
+    public function scopeDiffToRegions(array $diffJson, array $regionIds, array $oldMap, array $newMap): array
+    {
+        $scoped = $diffJson;
+        $scoped['provinces'] = [];
+        $summary = ['added' => 0, 'removed' => 0, 'renamed' => 0, 'parent_changed' => 0, 'code_reuse_suspected' => 0];
+
+        foreach (($diffJson['provinces'] ?? []) as $province => $groups) {
+            $scopedGroups = [];
+            $hasFact = false;
+            foreach (['added', 'removed', 'renamed', 'parent_changed', 'code_reuse_suspected'] as $kind) {
+                $rows = array_values(array_filter(
+                    $groups[$kind] ?? [],
+                    fn (array $row): bool => $this->isInRegions((int) $row['id'], $regionIds, $oldMap, $newMap),
+                ));
+                $scopedGroups[$kind] = $rows;
+                $summary[$kind] += count($rows);
+                $hasFact = $hasFact || $rows !== [];
+            }
+            if ($hasFact) {
+                $scoped['provinces'][$province] = $scopedGroups;
+            }
+        }
+
+        $scoped['summary'] = $summary;
+        $scoped['blocked'] = $summary['code_reuse_suspected'] > 0;
+
+        return $scoped;
     }
 
     /**

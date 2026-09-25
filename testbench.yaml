@@ -1,0 +1,41 @@
+# 本地预览（vendor/bin/testbench）：无 auth 的演示面板 + area 模块。
+# 升级管理界面按维护者工具开关打开（方案 §12）。
+providers:
+  - BladeUI\Icons\BladeIconsServiceProvider
+  - BladeUI\Heroicons\BladeHeroiconsServiceProvider
+  - RyanChandler\BladeCaptureDirective\BladeCaptureDirectiveServiceProvider
+  - Filament\Support\SupportServiceProvider
+  - Filament\Actions\ActionsServiceProvider
+  - Filament\Schemas\SchemasServiceProvider
+  - Filament\Forms\FormsServiceProvider
+  - Filament\Infolists\InfolistsServiceProvider
+  - Filament\Tables\TablesServiceProvider
+  - Filament\Notifications\NotificationsServiceProvider
+  - Filament\Widgets\WidgetsServiceProvider
+  - Filament\FilamentServiceProvider
+  - Livewire\LivewireServiceProvider
+  - Quansitech\Cmf\Core\CmfCoreServiceProvider
+  - Quansitech\Cmf\Area\Tests\Fixtures\Providers\AdminPanelProvider
+  - Quansitech\Cmf\Area\AreaServiceProvider
+
+env:
+  CMF_AREA_UPGRADE_ENABLED: true
+  # 文件型 sqlite（testbench 默认 :memory: 每次请求都是空库，无法预览）。
+  # 不设 DB_DATABASE：走骨架默认 database_path('database.sqlite')（绝对路径），
+  # 库文件为 vendor/orchestra/testbench-core/laravel/database/database.sqlite，
+  # 需先 touch 该文件再 vendor/bin/testbench migrate（testbench 检测不到文件会回退 :memory:）
+  DB_CONNECTION: sqlite
+  # 升级流程测试沙盒（tests/Fixtures/Providers/AdminPanelProvider.php）：
+  # 定稿落盘全部进骨架 storage/app/upgrade-sandbox，不碰包内真实数据；
+  # 首次访问自动播种基线 = 上游最新版本的上一个 Release csv（需网络与 7z，
+  # 失败回退 fixture），data_version 同步为该 tag，可选中最新版走完整升级流程。
+  # 重置沙盒：vendor/bin/testbench area:sandbox-reset
+  CMF_AREA_UPGRADE_SANDBOX: true
+  # 想免网络/7z 走 fixture 小 diff 流程时改为 true（并 area:sandbox-reset 重新播种）：
+  CMF_AREA_UPGRADE_STUB_UPSTREAM: false
+  # pi 绝对路径：web 请求内 PATH 解析不稳定（内置 server 环境变量随请求生命周期变化），
+  # 绝对路径绕开 PATH 查找；真实部署建议在 .env 配 CMF_AREA_UPGRADE_AGENT_COMMAND
+  CMF_AREA_UPGRADE_AGENT_COMMAND: /root/.local/bin/pi
+
+migrations:
+  - database/migrations

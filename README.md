@@ -10,6 +10,7 @@ QS CMF 行政区划模块：内置省市区乡镇四级区划数据（随包迁�
 - **AreaIdCast**：Eloquent 属性 cast，一行接入即获得强制校验
 - **后台管理**：区划树形浏览（默认省级、层级/状态筛选、详情页下级列表）、只读 Resource、Shield 权限点自动登记
 - **变更升级流水线**：`area:check-upstream` / `area:download` / `area:diff` / `area:check-changes` / `area:generate-migration` 五命令 + `area-upgrade` skill（AI 判读 SOP），产出"薄壳"迁移文件（冻结 payload，不含业务表名），业务项目 `migrate` 时按**本项目引用登记表**延迟绑定执行
+- **A 级精确回滚**：`migrate` 时每个写动作的行级现场（before-image）落 `cmf_area_migration_journal`，`migrate:rollback` 按日志逆序精确回放——结构行整行恢复（含时间戳）、业务行带守卫条件还原（升级后被业务改写的行跳过并进报告），不多改一行、不少改一行；确认无回滚需求后 `area:cleanup-journal {version}` 清理
 - **变更档案**：每次升级的判定类型、证据链接、AI 摘要、受影响行数落 `cmf_area_changes`
 
 ## 安装
@@ -90,17 +91,46 @@ php artisan area:generate-migration changes.json ...               # ⑤ 生成�
 - 业务表按**本项目引用登记表**逐列处理：`remap` 列自动改写、`keep` 列只出信息性报告；
 - 不可判定的（split 浅层值、部分疆域旁落、代码重用、无承继撤销）进**待人工清单**（迁移日志 + `storage/logs/area-migration-*.log`）。
 
-变更类型：`add` / `rename` / `parent_change` / `merge_into` / `split_from` / `code_change` / `code_reuse`（归档 id `90{原id}` 段）/ `abolish`。
+变更档案（changes.json v3，见 `skill/changes.schema.json`）只含两类记录：**node**（一个单位在某一版的
+存续状态，`state` 即定侧，无需写 `side`）与 **edge**（一条旧 id→新 id 对应关系，拍平任意层级）。
+变更类型标签（`add` / `rename` / `parent_change` / `merge_into` / `split_from` / `code_change` /
+`code_reuse` / `abolish`）由节点状态 + 出入边纯派生（不可手写）；continued 的 `attributes` 只声明
+字段名清单（值从两版 csv 取）；证据登记在文件级 `evidence` 池、记录只写引用 id（下级边可继承
+单位级边）；id 复用（同 id 换单位）必须显式声明 `id_reuse`，映射执行序由复用链拓扑排序确定
+（成环禁行转人工）。
+
+### 回滚（migrate:rollback）
+
+新版迁移文件（payload 带 `journal` 标记）的 `up()` 会把每行写入前的现场记入
+`cmf_area_migration_journal`（结构行整行、业务行单值，同事务分块）；`down()` 按日志逆序回放：
+
+- 结构操作（insert/retire/rename/reparent/archive，含链式复用覆盖）整行精确恢复或删除；
+- 业务列改写按主键 + 守卫条件还原（`WHERE pk=? AND col=新值`）：升级后被业务改写的行**跳过**
+  并写入回滚报告（`storage/logs/area-migration-{version}-rollback.log`），不误伤业务新数据；
+- 无单主键的业务表不支持行级日志：登记时可用 `pkColumn`（模型声明）/ `pk_column`（手工登记）
+  声明主键列，未声明且探测不到主键的列退回旧式值扫描并在报告中警告；
+- 观察窗口确认无回滚需求后，执行 `php artisan area:cleanup-journal {version}` 清理日志
+  （apply 报告末尾会附此提示；回滚成功后日志自动删除）。
+
+旧格式迁移文件（无 `journal` 标记）的 `down()` 仍走旧式值扫描并输出能力边界警告
+（rename/reparent/链式复用不在其自动回滚范围）；重新生成在途迁移文件即可获得精确回滚能力。
+整库回到升级时点（含升级后新业务数据消失）属数据库级 PITR（备份 + binlog 闪回），不在本框架范围。
 
 ## 测试
 
 ```bash
-cd area && composer install && vendor/bin/pest
+cd area && composer install && composer test
 ```
 
+- `composer test`：串行跑全量（脚本已内置 `XDEBUG_MODE=off`，避免本机 Xdebug 拖慢 ~45%）。
+- `composer test:parallel`：按文件分进程并行跑全量（paratest），多核机器上最快。
+- 直接 `vendor/bin/pest` 亦可，但请先 `export XDEBUG_MODE=off`（`xdebug.mode=debug` 会让套件慢近一倍）。
+
 覆盖：diff 判定、导入（BOM/引号/12 位 ext_id）、登记同步与类型拦截、强制校验（Cast/Picker）、
-迁移执行（五类结构 op、remap/keep 策略、幂等、回滚、延迟绑定）、changes.json 机器校验、
-真实案例回归（2024 和康县析自皮山县）、后台页面与数据端点。
+迁移执行（五类结构 op、remap/keep 策略、幂等、延迟绑定）、A 级精确回滚（链式复用整行恢复、
+废止复用 status 恢复、rename/reparent 反转、守卫跳过清单、无日志拒绝回滚、chunk 大数据量、
+无单主键回退、cleanup-journal）、changes.json v3 机器校验（I1–I5/I7 不变量、证据池与继承、
+id_reuse 链拓扑执行序、复用环禁环）、真实案例回归（2024 和康县析自皮山县）、后台页面与数据端点。
 
 ## 文档
 

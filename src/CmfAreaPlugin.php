@@ -21,8 +21,14 @@ class CmfAreaPlugin implements Plugin
 
     public function register(Panel $panel): void
     {
-        $panel->resources([
+        // 升级管理界面是包的维护者工具：页面始终注册（路由存在），
+        // 可见性由 AreaUpgradePage::canAccess 在运行期按 config 开关拦截（升级方案 §12），
+        // 业务项目后台默认 403 + 不出现在导航。
+        $panel->resources(array_filter([
             config('cmf-area.resource'),
+        ]));
+        $panel->pages([
+            Filament\Pages\AreaUpgradePage::class,
         ]);
     }
 
